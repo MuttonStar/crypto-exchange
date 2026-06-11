@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/MuttonStar/crypto-exchange2/orderbook"
 	"github.com/labstack/echo/v4"
@@ -102,6 +103,7 @@ func (ex *Exchange) handleGetBook(c echo.Context) error {
 	for _,limit := range ob.Bids() {
 		for _,order := range limit.Orders {
 			o := Order {
+				ID:				order.ID,
 				Prcie: 			limit.Price,
 				Size:			order.Size,
 				Bid:			order.Bid,
@@ -114,29 +116,32 @@ func (ex *Exchange) handleGetBook(c echo.Context) error {
 	return c.JSON(http.StatusOK,orderbookData)
 }
 
-// type CancelOrderRequest struct {
-// 	Bid bool
-// 	ID 	int64
-// }
+type CancelOrderRequest struct {
+	Bid bool
+	ID 	int64
+}
 
 //取消订单
-// func (ex *Exchange) cancelOrder(c echo.Context) error {
-// 	var CancelOrderRequest CancelOrderRequest
-// 	if err := json.NewDecoder(c.Request().Body).Decode(&CancelOrderRequest); err != nil {
-// 		return err
-// 	}
+func (ex *Exchange) cancelOrder(c echo.Context) error {
+	idStr := c.Param("id")
+	id,_ := strconv.Atoi(idStr)
 
-// 	if CancelOrderRequest.Bid {
-// 		for _,
-// 	}
+	ob := ex.orderbooks[MarketETH]
+	order := ob.Orders[int64(id)]
+	ob.CancelOrder(order)
 
-// 	return nil
-// }
+	return c.JSON(200,map[string]any{"msg":"order deleted"})
+}
+
+type MarketOrders struct {
+	Price	float64	
+	Size	float64
+	ID 		int64
+}
 
 //处理下单
 func (ex *Exchange)handlePlaceOrder(c echo.Context) error {
 	var placeOrderData PlaceOrderRequest
-
 	if err := json.NewDecoder(c.Request().Body).Decode(&placeOrderData) ; err != nil {
 		return err
 	}
@@ -150,9 +155,30 @@ func (ex *Exchange)handlePlaceOrder(c echo.Context) error {
 		return c.JSON(200,map[string]any{"msg":"limit order placed"})
 	}
 
+	//下市单时，显示对应的匹配
 	if placeOrderData.Type == MarketOrder {
 		matches := ob.PlaceMarketOrder(order) // 市价单无需设置价格
-		return c.JSON(200,map[string]any{"matches":len(matches)})
+		matchesOrders := make([]*MarketOrders,len(matches))
+
+		isBid := false
+		if order.Bid {
+			isBid = true
+		}
+		
+		for i := 0 ; i < len(matchesOrders) ; i++ {
+			id := matches[i].Bid.ID
+			if isBid {
+				id = matches[i].Ask.ID
+			}
+			matchesOrders[i] = &MarketOrders {
+				ID:	  	 id,
+				Size:	 matches[i].SizeFilled,
+				Price: 	 matches[i].Price,
+			}
+		}
+
+
+		return c.JSON(200,map[string]any{"matches":matchesOrders})
 	}
 
 	return nil

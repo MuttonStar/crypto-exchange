@@ -48,6 +48,9 @@ func TestPlaceLimitOrder(t *testing.T){
 	ob.PlaceLimitOrder(10000,sellOrderA)
 	ob.PlaceLimitOrder(11000,sellOrderB)
 
+	assert(t,len(ob.Orders),2)
+	assert(t,ob.Orders[sellOrderA.ID],sellOrderA)
+	assert(t,ob.Orders[sellOrderB.ID],sellOrderB)
 	assert(t,len(ob.asks),2)
 }
 
@@ -103,6 +106,9 @@ func TestCancelOrder(t *testing.T) {
 	assert(t,ob.BidTotalVolume(),4.0)
 
 	ob.CancelOrder(buyOrder)
-
 	assert(t,ob.BidTotalVolume(),0.0)
+
+	_,ok := ob.Orders[buyOrder.ID]
+	assert(t, ok, false)
 }
+
